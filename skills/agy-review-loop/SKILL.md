@@ -97,6 +97,27 @@ Stop and ask the user for direction when:
 - a required action needs new authority, credentials, destructive changes, or external coordination; or
 - Antigravity is unavailable, unauthenticated, or repeatedly fails before producing usable work.
 
+## Daily reconciliation (on demand)
+
+Do not run a background job or call Antigravity for a read-only daily update. When the user asks to reconcile the day, prefer the outer `codex-longrun` workflow:
+
+1. Read `docs/agent/PROJECT_STATE.md`, `BACKLOG.md`, and `HANDOFF.md` when present.
+2. Inspect `git status --short --branch`, `git diff --stat HEAD`, and recent commits.
+3. Classify evidence as `VERIFIED`, `REPORTED`, `INFERRED`, or `UNKNOWN`.
+4. Report completed work, unfinished work, blockers, risks, and exactly one next `READY` task.
+5. Do not edit product code or call `agy` until the user approves a task.
+
+For a compact read-only snapshot, run the repository's `scripts/daily_snapshot.py`. Read [van-hanh-hang-ngay.md](references/van-hanh-hang-ngay.md) for the Vietnamese daily prompts.
+
+## Cost controls
+
+- Use 1–2 rounds for small tasks; use the default maximum of 5 only when necessary.
+- Stop after two no-progress rounds instead of spending more quota.
+- Keep prompts self-contained and review findings short; do not repeat full logs or old conversation history.
+- Run the cheapest falsifying check first and avoid a full suite for read-only status work.
+- Split large work into separate `READY` tasks rather than one oversized AGY call.
+- Never promise a fixed token or credit amount; usage depends on model, repository size, task complexity, and output.
+
 ## Skill composition
 
 - **`codex-longrun` outside:** use it for durable state, one `READY` task at a time, checkpoints, handoffs, and resumption across sessions.

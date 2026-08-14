@@ -10,6 +10,8 @@ Use one owner for each concern:
 
 The layers should not recursively invoke each other. In practice, start a task with `$codex-longrun`, apply `$ponytail` when choosing the implementation, and explicitly invoke `$agy-review-loop` for the single `READY` task.
 
+Daily reconciliation is a separate, read-only `codex-longrun` action. It should inspect durable state and Git without calling AGY; delegate only the approved `READY` task afterward.
+
 ## Prompt template
 
 ```text
@@ -36,3 +38,4 @@ Then use $agy-review-loop to delegate that READY task to Antigravity CLI. Keep t
 - **Scope drift:** reject unrelated files and ask Antigravity to revert only its unrelated changes without touching pre-existing user work.
 - **Visual false positives:** require a running localhost check or screenshot for UI acceptance; a passing build is not visual proof.
 - **Credit/permission exhaustion:** do not bypass limits or permissions; report the exact denied operation.
+- **Cost drift:** prefer 1–2 rounds for small tasks, keep review findings compact, and stop after two no-progress rounds.

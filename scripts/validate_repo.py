@@ -20,10 +20,15 @@ def main() -> int:
         SKILL / "SKILL.md",
         SKILL / "agents" / "openai.yaml",
         SKILL / "references" / "integrations.md",
+        SKILL / "references" / "van-hanh-hang-ngay.md",
+        SKILL / "references" / "chi-phi-va-rui-ro.md",
         ROOT / "README.md",
         ROOT / "LICENSE",
         ROOT / "CONTRIBUTING.md",
         ROOT / "SECURITY.md",
+        ROOT / "docs" / "van-hanh-hang-ngay.md",
+        ROOT / "docs" / "chi-phi-va-rui-ro.md",
+        ROOT / "scripts" / "daily_snapshot.py",
     ]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]
     if missing:
@@ -44,6 +49,9 @@ def main() -> int:
         fail("frontmatter description is required")
     if (SKILL / "README.md").exists():
         fail("keep user-facing README at repository root, not inside the skill")
+    for marker in ("## Daily reconciliation (on demand)", "## Cost controls"):
+        if marker not in text:
+            fail(f"SKILL.md is missing {marker}")
 
     yaml = (SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
     for marker in ("display_name:", "short_description:", "default_prompt:", "allow_implicit_invocation: false"):

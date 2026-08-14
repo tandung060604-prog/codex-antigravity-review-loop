@@ -18,6 +18,18 @@ class RepositoryStructureTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_daily_snapshot_is_read_only_and_usable(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "daily_snapshot.py"), str(ROOT)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("BRANCH:", result.stdout)
+        self.assertIn("STATE_FILES:", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
