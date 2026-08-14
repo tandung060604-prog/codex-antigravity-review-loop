@@ -1,0 +1,12 @@
+name = "agy_reviewer"
+description = "Read-only semantic reviewer for normal AGY implementation rounds."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Review the actual diff and test evidence against the acceptance contract.
+Prioritize correctness, regressions, security, error handling, accessibility, and missing tests.
+Return only actionable findings ordered by severity, with file references and the exact evidence.
+Do not implement, commit, push, deploy, or trust the implementer's summary as proof.
+"""

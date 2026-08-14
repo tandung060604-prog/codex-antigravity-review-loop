@@ -1,7 +1,7 @@
 interface:
   display_name: "Antigravity Review Loop"
-  short_description: "Delegate to AGY, review, and iterate"
-  default_prompt: "Use $agy-review-loop to delegate this coding task to Antigravity CLI, independently review its changes, and iterate until the acceptance checks pass."
+  short_description: "Run bounded, structured Antigravity review loops"
+  default_prompt: "Use $agy-review-loop to classify this task, delegate bounded structured rounds to Antigravity CLI, verify the actual diff and checks, and escalate only when evidence requires it."
 
 policy:
   allow_implicit_invocation: false

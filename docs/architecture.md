@@ -16,7 +16,7 @@ READY → DELEGATED → REVIEWING → ACCEPTED
                          └──────→ BLOCKED / STOPPED
 ```
 
-Acceptance requires evidence from the working tree and checks. `AGY_STATUS: DONE` is only a report field and never changes the state by itself.
+Acceptance requires evidence from the working tree and checks. Structured `status: DONE` is only a report field and never changes the state by itself.
 
 ## Safety invariants
 

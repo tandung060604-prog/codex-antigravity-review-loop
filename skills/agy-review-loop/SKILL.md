@@ -11,7 +11,7 @@ Use Antigravity as an implementation worker and Codex as the independent reviewe
 
 - Invoke only after the user explicitly requests `$agy-review-loop` or asks Codex to delegate the task to Antigravity CLI.
 - Work in the user's target repository and preserve unrelated staged, unstaged, and untracked changes.
-- Use at most 5 Antigravity rounds unless the user explicitly sets another bound.
+- Classify the task as `routine`, `standard`, `complex`, or `critical`; use the corresponding 2/3/4/5-round ceiling unless the user sets a lower bound.
 - Never commit, push, deploy, publish, delete material data, or change external systems unless the user separately requests it.
 - Never pass `--dangerously-skip-permissions` unless the user explicitly authorizes it for this run.
 - Treat credentials, quota exhaustion, denied permissions, destructive actions, and external coordination as blockers that require user direction.
@@ -22,17 +22,25 @@ Use Antigravity as an implementation worker and Codex as the independent reviewe
 2. Confirm the CLI is available with `agy --version`; inspect `agy --help` if flags differ.
 3. Record the baseline with `git status --short --branch` and preserve unrelated changes.
 4. Translate the user's request into observable acceptance checks, including relevant tests, lint, type checks, builds, and manual/browser checks.
-5. If `codex-longrun` is active, select exactly one `READY` task and keep durable project-state files owned by the outer long-run workflow.
+5. Classify risk using [references/routing-and-escalation.md](references/routing-and-escalation.md). Treat model choices as advisory; do not silently change the user's current Codex model.
+6. If `codex-longrun` is active, select exactly one `READY` task and keep durable project-state files owned by the outer long-run workflow.
 
 ## Delegate
 
-Run Antigravity from the target repository in non-interactive print mode:
+Write the prompt to a unique UTF-8 temporary file outside the target repository, then run one structured round through the bundled helper:
 
 ```text
-agy -p <prompt-as-one-argument> --output-format text
+python <skill-root>/scripts/agy_round.py \
+  --repo <target-repository> \
+  --task-id <safe-task-id> \
+  --round 1 \
+  --class <routine|standard|complex|critical> \
+  --prompt-file <temporary-prompt-file>
 ```
 
-Pass the task as one argument through the shell/execution API. Do not interpolate untrusted task text into shell syntax. Use a unique temporary file only when the execution API cannot safely pass a single argument.
+The helper passes arguments without a shell, pins the policy model, requests `stream-json` with [assets/agy-result.schema.json](assets/agy-result.schema.json), and stores a compact summary under `.agy-review/<task-id>/`. It does not save the raw prompt. Raw JSONL is opt-in with `--save-events` because tool events can contain sensitive data. Ensure `.agy-review/` is ignored before retaining metrics in a product repository.
+
+If the installed CLI lacks `--output-format stream-json` or `--json-schema`, fall back to text mode and report that metrics/schema enforcement are unavailable; do not guess fields.
 
 Use a self-contained prompt:
 
@@ -50,18 +58,14 @@ Acceptance checks:
 
 Inspect before editing. Preserve unrelated and pre-existing changes. Make the smallest coherent change that solves the task. Run the listed checks. Do not commit, push, deploy, publish, or broaden scope.
 
-End with:
-AGY_STATUS: DONE or BLOCKED
-CHANGED: concise file/change summary
-CHECKS: commands and outcomes
-RISKS: remaining uncertainty or NONE
+Return only the schema fields: status, changed_files, checks, risks, and blocker.
 ```
 
 Use fresh calls by default. Do not use `-c` or `--continue`, because resuming the globally most recent conversation can mix tasks. Use `--conversation <id>` only when the CLI returns an exact conversation ID and ownership for this task is verified.
 
 ## Review after every round
 
-1. Read stdout and stderr as claims, not proof.
+1. Read the structured round summary as claims, not proof. Record the reported AGY usage metrics but do not infer API cost from them.
 2. Inspect the actual working tree and compare it with the baseline.
 3. Read every materially changed region and affected callers/consumers.
 4. Run the cheapest falsifying check first, then the broader acceptance checks.
@@ -72,27 +76,42 @@ Accept only when every user requirement is met, relevant checks pass, no materia
 
 ## Iterate
 
-When review finds a problem, send another self-contained prompt containing the original goal and only actionable findings:
+When review finds a problem, create another prompt file containing only the acceptance contract and actionable delta:
 
 ```text
 Continue the task in the repository's current state.
 
-Original goal:
-<goal>
+Acceptance contract:
+<concise goal, allowed scope, and checks>
 
-Codex review found:
-1. <finding with file, evidence, and expected correction>
-2. <test failure or missing requirement>
+Finding:
+<file and line>
+
+Observed:
+<actual behavior>
+
+Expected:
+<required behavior>
+
+Evidence:
+<test failure, diff, or reproduction>
+
+Allowed scope:
+<files or directories>
 
 Fix these findings without reverting unrelated changes or expanding scope. Re-run:
 <checks>
 
-End with the same AGY_STATUS / CHANGED / CHECKS / RISKS block.
+Return only the same structured schema.
 ```
+
+Run the next numbered round with the same task ID. Prefer fresh calls. Pass `--conversation <id>` only when the helper's existing summary proves that ID belongs to an earlier round of the same task.
+
+Do not repeat the same model against the same blocker. Escalate Flash Medium to Flash High after evidence shows an implementation blocker. Use Gemini Pro only after diagnosis and explicit user approval, then pass `--model gemini-3.1-pro-high --approve-pro`. Escalate Codex review to a high-capability reviewer for security, architecture, data integrity, or unresolved ambiguity; do not spend multiple reviewers on routine work.
 
 Stop and ask the user for direction when:
 
-- 5 rounds are exhausted without acceptance;
+- the class-specific round ceiling is exhausted without acceptance;
 - two consecutive rounds make no material progress on the same blocker;
 - a required action needs new authority, credentials, destructive changes, or external coordination; or
 - Antigravity is unavailable, unauthenticated, or repeatedly fails before producing usable work.
@@ -116,7 +135,9 @@ For a compact read-only snapshot, run the repository's `scripts/daily_snapshot.p
 - Keep prompts self-contained and review findings short; do not repeat full logs or old conversation history.
 - Run the cheapest falsifying check first and avoid a full suite for read-only status work.
 - Split large work into separate `READY` tasks rather than one oversized AGY call.
+- Keep raw AGY event logging off unless the user needs an audit trace; compact summaries retain usage without tool payloads.
 - Never promise a fixed token or credit amount; usage depends on model, repository size, task complexity, and output.
+- Mark Codex/OpenAI token usage `UNKNOWN` unless the host explicitly exposes it; AGY metrics do not include Codex usage.
 
 ## Skill composition
 

@@ -13,7 +13,7 @@ Không thể quy đổi cố định một yêu cầu thành một số token/cr
 
 - Đối chiếu hằng ngày bằng `codex-longrun` ở chế độ chỉ đọc; không gọi AGY nếu chưa có task cần sửa.
 - Chia việc lớn thành task `READY` nhỏ có acceptance criteria.
-- Đặt 1–2 vòng cho bug/feature nhỏ; chỉ dùng 5 vòng khi task thực sự cần.
+- Dùng trần động 2/3/4/5 vòng theo class; đặt thấp hơn khi task nhỏ.
 - Yêu cầu AGY trả block trạng thái ngắn, không dán toàn bộ log.
 - Review diff và chạy test mục tiêu trước suite đầy đủ.
 - Không dùng `--continue` mặc định vì có thể kéo theo context cũ.

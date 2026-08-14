@@ -22,6 +22,10 @@ def main() -> int:
         SKILL / "references" / "integrations.md",
         SKILL / "references" / "van-hanh-hang-ngay.md",
         SKILL / "references" / "chi-phi-va-rui-ro.md",
+        SKILL / "references" / "routing-and-escalation.md",
+        SKILL / "assets" / "agy-result.schema.json",
+        SKILL / "assets" / "routing-policy.json",
+        SKILL / "scripts" / "agy_round.py",
         ROOT / "README.md",
         ROOT / "LICENSE",
         ROOT / "CONTRIBUTING.md",
@@ -52,6 +56,9 @@ def main() -> int:
     for marker in ("## Daily reconciliation (on demand)", "## Cost controls"):
         if marker not in text:
             fail(f"SKILL.md is missing {marker}")
+    for marker in ("stream-json", "routing-and-escalation.md", "agy_round.py"):
+        if marker not in text:
+            fail(f"SKILL.md is missing structured protocol marker: {marker}")
 
     yaml = (SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
     for marker in ("display_name:", "short_description:", "default_prompt:", "allow_implicit_invocation: false"):

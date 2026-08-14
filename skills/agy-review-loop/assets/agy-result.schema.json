@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgyReviewResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "changed_files", "checks", "risks", "blocker"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["DONE", "BLOCKED"]
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "status"],
+        "properties": {
+          "command": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["PASS", "FAIL", "NOT_RUN"]
+          },
+          "details": {"type": "string"}
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "blocker": {
+      "type": ["string", "null"]
+    }
+  }
+}
