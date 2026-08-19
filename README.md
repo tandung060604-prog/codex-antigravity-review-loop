@@ -70,11 +70,13 @@ Nếu muốn không dùng AI credits khi quota cơ bản hết, mở Antigravity
 
 ## Cách dùng trong mỗi phiên Codex
 
-Không cần tự gõ lệnh `agy` trong terminal. Trong phiên đang mở đúng project, gửi một yêu cầu có mục tiêu, phạm vi và tiêu chí kiểm tra:
+Không cần tự gõ `agy` hoặc `$agy-review-loop`. Codex có thể tự chọn skill cho task code đủ lớn như sửa bug, làm feature, refactor hoặc UI. Skill bỏ qua câu hỏi chỉ đọc, status/kế hoạch, sửa rất nhỏ và thay đổi chỉ có tài liệu để tránh tốn quota.
+
+Codex sẽ báo trước khi bắt đầu giao việc cho Antigravity. Muốn tắt trong một task, nói: `Không dùng Antigravity cho task này.` Bạn vẫn có thể gọi `$agy-review-loop` trực tiếp khi muốn ép sử dụng.
+
+Trong phiên đang mở đúng project, gửi một yêu cầu có mục tiêu, phạm vi và tiêu chí kiểm tra:
 
 ```text
-$agy-review-loop
-
 Trong project hiện tại, sửa lỗi validation của form đăng nhập.
 
 Tiêu chí hoàn thành:
@@ -88,8 +90,6 @@ Tiêu chí hoàn thành:
 Với localhost/UI:
 
 ```text
-$agy-review-loop
-
 Trong project localhost hiện tại, thêm motion tinh tế cho các khối giao diện:
 - section entrance và scroll reveal;
 - stagger cho card/list;
@@ -152,7 +152,7 @@ codex-longrun  →  ponytail  →  agy-review-loop  →  Antigravity CLI
 
 - `codex-longrun`: quản lý task `READY`, acceptance criteria, state, checkpoint và handoff.
 - `ponytail`: buộc Codex/Antigravity tìm cách đơn giản nhất, tái sử dụng code/dependency và tránh abstraction thừa.
-- `agy-review-loop`: chỉ lo giao việc, review bằng chứng và lặp sửa có giới hạn.
+- `agy-review-loop`: tự tham gia khi task triển khai đủ lớn; chỉ lo giao việc, review bằng chứng và lặp sửa có giới hạn.
 
 Prompt mẫu cho task dài:
 
@@ -258,6 +258,7 @@ Skill ghi được usage do Antigravity trả về. Usage của phiên Codex/Ope
 | Raw JSONL chứa tool payload | mặc định không lưu; chỉ bật sau khi đánh giá dữ liệu và bảo đảm `.agy-review/` bị ignore |
 | Tự ý commit/deploy/mua credit | skill chặn mặc định và yêu cầu user xác nhận |
 | State hằng ngày bị cũ | dùng `codex-longrun`, ghi checkpoint bằng command/result thực tế |
+| Tự kích hoạt cho task không đáng | description loại trừ read-only, status, sửa nhỏ và docs-only; user có thể opt out |
 | Tự động chạy khi không có mặt | skill không chạy nền; muốn lịch tự động phải thiết lập automation riêng |
 
 ## Giới hạn cần biết
@@ -265,6 +266,7 @@ Skill ghi được usage do Antigravity trả về. Usage của phiên Codex/Ope
 - Skill không đảm bảo code đúng chỉ vì Antigravity trả `DONE`.
 - Skill không thay thế review nghiệp vụ, security review hoặc QA production.
 - Skill không tự động mua AI credits và không vượt hạn mức Google AI Pro.
+- Tự kích hoạt là lựa chọn theo nội dung chat, không bảo đảm chạy trong mọi yêu cầu không liên quan.
 - Skill không tự động “đối chiếu hằng ngày” nếu bạn không mở phiên hoặc thiết lập automation riêng.
 - Skill không đo được tổng chi phí OpenAI + Google; nó chỉ lưu usage AGY mà CLI thực sự trả về.
 - Nên dùng Guided mode của `codex-longrun` cho thay đổi lớn; chỉ dùng Autonomous mode khi bạn đã phê duyệt task.

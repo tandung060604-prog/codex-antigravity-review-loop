@@ -61,7 +61,7 @@ def main() -> int:
             fail(f"SKILL.md is missing structured protocol marker: {marker}")
 
     yaml = (SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
-    for marker in ("display_name:", "short_description:", "default_prompt:", "allow_implicit_invocation: false"):
+    for marker in ("display_name:", "short_description:", "default_prompt:", "allow_implicit_invocation: true"):
         if marker not in yaml:
             fail(f"openai.yaml is missing {marker}")
 

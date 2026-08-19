@@ -1,6 +1,6 @@
 ---
 name: agy-review-loop
-description: Delegate an explicitly requested local coding task to Google Antigravity CLI (`agy`), independently inspect its real changes and validation, and send bounded correction prompts until the acceptance criteria pass. Use only when the user explicitly asks Codex to use, control, delegate to, or iteratively review Antigravity CLI work.
+description: Delegate non-trivial local coding, debugging, refactoring, or UI implementation to Google Antigravity CLI (`agy`), then independently review its real changes and validation in bounded correction rounds. Do not use for read-only or status work, trivial or documentation-only edits, or when the user opts out of Antigravity.
 ---
 
 # Antigravity Review Loop
@@ -9,7 +9,9 @@ Use Antigravity as an implementation worker and Codex as the independent reviewe
 
 ## Operating contract
 
-- Invoke only after the user explicitly requests `$agy-review-loop` or asks Codex to delegate the task to Antigravity CLI.
+- May activate implicitly for non-trivial local repository implementation tasks that match the description. Explicit `$agy-review-loop` invocation remains supported.
+- Do not invoke Antigravity for read-only analysis, status or planning, trivial or documentation-only edits, or when the user says not to use Antigravity.
+- Before the first Antigravity round, briefly tell the user that delegation is starting and may consume their Antigravity quota. Continue without asking unless the task needs new authority, Gemini Pro, or a destructive action.
 - Work in the user's target repository and preserve unrelated staged, unstaged, and untracked changes.
 - Classify the task as `routine`, `standard`, `complex`, or `critical`; use the corresponding 2/3/4/5-round ceiling unless the user sets a lower bound.
 - Never commit, push, deploy, publish, delete material data, or change external systems unless the user separately requests it.

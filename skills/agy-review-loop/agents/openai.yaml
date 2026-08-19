@@ -1,7 +1,7 @@
 interface:
   display_name: "Antigravity Review Loop"
-  short_description: "Run bounded, structured Antigravity review loops"
-  default_prompt: "Use $agy-review-loop to classify this task, delegate bounded structured rounds to Antigravity CLI, verify the actual diff and checks, and escalate only when evidence requires it."
+  short_description: "Auto-route substantive coding through AGY review"
+  default_prompt: "Use $agy-review-loop to classify this repository task, delegate bounded Antigravity rounds when it is non-trivial, and verify the actual diff and checks."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

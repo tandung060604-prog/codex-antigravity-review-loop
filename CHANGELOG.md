@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Enabled conditional implicit invocation for substantive coding tasks, with low-value exclusions and a per-task opt-out.
+
 ## 0.2.0 - 2026-08-14
 
 - Added JSON Schema and `stream-json` round execution with compact AGY usage summaries.
