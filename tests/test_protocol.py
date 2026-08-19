@@ -80,6 +80,24 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(totals["model_sequence"], ["m", "m2"])
         self.assertEqual(totals["usage"]["total_tokens"], 18)
 
+    def test_permission_failure_is_not_reported_as_bad_protocol(self) -> None:
+        failure = self.runner.classify_failure(
+            1,
+            {
+                "status": "ERROR",
+                "error": 'permission check failed for command "git status": user denied permission',
+            },
+            "",
+        )
+        self.assertEqual(failure["kind"], "PERMISSION_BLOCKED")
+
+    def test_fresh_round_gets_an_isolated_project(self) -> None:
+        self.assertEqual(self.runner.project_scope_args(None), ["--new-project"])
+        self.assertEqual(
+            self.runner.project_scope_args("conversation-1"),
+            ["--conversation", "conversation-1"],
+        )
+
     def test_codex_templates_are_valid_toml(self) -> None:
         files = list((ROOT / "examples" / "codex-profiles").glob("*.toml"))
         files += list((ROOT / "examples" / "codex-agents").glob("*.toml"))

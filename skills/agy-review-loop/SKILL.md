@@ -22,10 +22,11 @@ Use Antigravity as an implementation worker and Codex as the independent reviewe
 
 1. Read applicable `AGENTS.md` and repository instructions.
 2. Confirm the CLI is available with `agy --version`; inspect `agy --help` if flags differ.
-3. Record the baseline with `git status --short --branch` and preserve unrelated changes.
-4. Translate the user's request into observable acceptance checks, including relevant tests, lint, type checks, builds, and manual/browser checks.
-5. Classify risk using [references/routing-and-escalation.md](references/routing-and-escalation.md). Treat model choices as advisory; do not silently change the user's current Codex model.
-6. If `codex-longrun` is active, select exactly one `READY` task and keep durable project-state files owned by the outer long-run workflow.
+3. Non-interactive print mode cannot answer `Ask` permission prompts. Prefer narrow Antigravity allow rules for the exact read-only Git and validation commands the task needs; never add `command(*)`. `proceed-in-sandbox` is an alternative only after a successful sandbox smoke test because some Windows commands may request unsandboxed escalation.
+4. Record the baseline with `git status --short --branch` and preserve unrelated changes.
+5. Translate the user's request into observable acceptance checks, including relevant tests, lint, type checks, builds, and manual/browser checks.
+6. Classify risk using [references/routing-and-escalation.md](references/routing-and-escalation.md). Treat model choices as advisory; do not silently change the user's current Codex model.
+7. If `codex-longrun` is active, select exactly one `READY` task and keep durable project-state files owned by the outer long-run workflow.
 
 ## Delegate
 
@@ -40,7 +41,9 @@ python <skill-root>/scripts/agy_round.py \
   --prompt-file <temporary-prompt-file>
 ```
 
-The helper passes arguments without a shell, pins the policy model, requests `stream-json` with [assets/agy-result.schema.json](assets/agy-result.schema.json), and stores a compact summary under `.agy-review/<task-id>/`. It does not save the raw prompt. Raw JSONL is opt-in with `--save-events` because tool events can contain sensitive data. Ensure `.agy-review/` is ignored before retaining metrics in a product repository.
+The helper passes arguments without a shell, creates a new AGY project for every fresh round so file and command tools bind to the target repository, pins the policy model, requests `stream-json` with [assets/agy-result.schema.json](assets/agy-result.schema.json), and stores a compact summary under `.agy-review/<task-id>/`. A verified `--conversation` resumes that conversation's project instead. It does not save the raw prompt. Raw JSONL is opt-in with `--save-events` because tool events can contain sensitive data. Ensure `.agy-review/` is ignored before retaining metrics in a product repository. Terminal sandboxing remains opt-in with `--sandbox` because Windows AppContainer may require an interactive unsandboxed escalation for locally installed tools.
+
+If a round returns `failure.kind: PERMISSION_BLOCKED`, stop immediately. This is an Antigravity runtime permission failure, not a structured-output/schema failure. Configure narrow allow rules or verify `proceed-in-sandbox`, then retry the same round with `--force`; do not spend another model round against the same permission blocker.
 
 If the installed CLI lacks `--output-format stream-json` or `--json-schema`, fall back to text mode and report that metrics/schema enforcement are unavailable; do not guess fields.
 
@@ -63,7 +66,7 @@ Inspect before editing. Preserve unrelated and pre-existing changes. Make the sm
 Return only the schema fields: status, changed_files, checks, risks, and blocker.
 ```
 
-Use fresh calls by default. Do not use `-c` or `--continue`, because resuming the globally most recent conversation can mix tasks. Use `--conversation <id>` only when the CLI returns an exact conversation ID and ownership for this task is verified.
+Use fresh calls by default. The helper adds `--new-project`; this is required because AGY's default CLI project may retain another workspace even when `init.cwd` looks correct. Do not use `-c` or `--continue`, because resuming the globally most recent conversation can mix tasks. Use `--conversation <id>` only when the CLI returns an exact conversation ID and ownership for this task is verified.
 
 ## Review after every round
 

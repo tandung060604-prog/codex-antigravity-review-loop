@@ -91,6 +91,38 @@ def validate_result(value: Any) -> list[str]:
     return errors
 
 
+def classify_failure(returncode: int, result_event: dict[str, Any] | None, stderr: str) -> dict[str, str] | None:
+    status = result_event.get("status") if result_event else None
+    if returncode == 0 and status != "ERROR":
+        return None
+
+    error = result_event.get("error", "") if result_event else ""
+    details = f"{error}\n{stderr}".lower()
+    if "permission check failed" in details or "user denied permission" in details:
+        return {
+            "kind": "PERMISSION_BLOCKED",
+            "message": "Antigravity could not approve a tool request in non-interactive print mode.",
+        }
+    if "not logged into antigravity" in details or "authentication required" in details:
+        return {
+            "kind": "AUTH_REQUIRED",
+            "message": "Antigravity authentication is required.",
+        }
+    if "timed out" in details or "timeout" in details:
+        return {
+            "kind": "TIMEOUT",
+            "message": "Antigravity did not finish before the configured timeout.",
+        }
+    return {
+        "kind": "AGY_RUNTIME_ERROR",
+        "message": "Antigravity exited before producing a usable result.",
+    }
+
+
+def project_scope_args(conversation: str | None) -> list[str]:
+    return ["--conversation", conversation] if conversation else ["--new-project"]
+
+
 def aggregate(rounds: list[dict[str, Any]]) -> dict[str, Any]:
     totals = {field: 0 for field in USAGE_FIELDS}
     models: list[str] = []
@@ -185,6 +217,7 @@ def main() -> int:
     prompt = prompt_path.read_text(encoding="utf-8")
     command = [
         agy,
+        *project_scope_args(args.conversation),
         "-p",
         prompt,
         "--mode",
@@ -198,8 +231,6 @@ def main() -> int:
         "--print-timeout",
         args.print_timeout,
     ]
-    if args.conversation:
-        command.extend(["--conversation", args.conversation])
     if args.sandbox:
         command.append("--sandbox")
 
@@ -217,7 +248,8 @@ def main() -> int:
     events, warnings = parse_events(completed.stdout)
     result_event = next((item["result"] for item in reversed(events) if item.get("event") == "result" and isinstance(item.get("result"), dict)), None)
     structured_output = result_event.get("structured_output") if result_event else None
-    protocol_errors = validate_result(structured_output)
+    failure = classify_failure(completed.returncode, result_event, completed.stderr)
+    protocol_errors = [] if failure else validate_result(structured_output)
 
     init_event = next((item.get("init") for item in events if item.get("event") == "init"), None)
     conversation_id = None
@@ -237,7 +269,12 @@ def main() -> int:
         "conversation_id": conversation_id,
         "process_returncode": completed.returncode,
         "agy_status": result_event.get("status") if result_event else "MISSING_RESULT",
-        "protocol_status": structured_output.get("status") if isinstance(structured_output, dict) else "INVALID",
+        "protocol_status": (
+            structured_output.get("status")
+            if isinstance(structured_output, dict)
+            else "NOT_REACHED" if failure else "INVALID"
+        ),
+        "failure": failure,
         "review_outcome": "PENDING_CODEX_REVIEW",
         "duration_seconds": result_event.get("duration_seconds") if result_event else None,
         "usage": usage,
@@ -247,7 +284,9 @@ def main() -> int:
     }
     if isinstance(init_event, dict) and init_event.get("model") != model:
         record["warnings"].append(f"AGY initialized unexpected model: {init_event.get('model')}")
-    if completed.stderr.strip():
+    if failure:
+        record["warnings"].append(failure["message"])
+    elif completed.stderr.strip():
         record["warnings"].append("AGY wrote to stderr; inspect the live run output")
 
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -270,7 +309,7 @@ def main() -> int:
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(record, ensure_ascii=False, indent=2))
 
-    if completed.returncode != 0 or result_event is None:
+    if failure or result_event is None:
         return 2
     if protocol_errors:
         return 3

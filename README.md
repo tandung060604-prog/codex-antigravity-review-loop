@@ -75,6 +75,23 @@ agy -p "Reply with exactly AGY_OK. Do not edit files or run commands." --output-
 
 Nếu `agy` chưa chạy hoặc chưa đăng nhập, hãy hoàn tất bước đó trước khi cài skill.
 
+Vì skill gọi AGY ở chế độ không tương tác, Antigravity không thể chờ bạn bấm **Allow**. Cấu hình an toàn là giữ `request-review` và chỉ tự động cho phép các lệnh đọc/kiểm thử thực sự cần trong `%USERPROFILE%\.gemini\antigravity-cli\settings.json` (Windows) hoặc `~/.gemini/antigravity-cli/settings.json` (macOS/Linux):
+
+```json
+{
+  "toolPermission": "request-review",
+  "permissions": {
+    "allow": [
+      "command(git status)",
+      "command(git diff)",
+      "command(python -m pytest)"
+    ]
+  }
+}
+```
+
+Giữ lại các khóa khác đang có trong file và thay allowlist theo stack của repo. Không dùng `command(*)` hoặc `--dangerously-skip-permissions`. Có thể thử `proceed-in-sandbox` với `enableTerminalSandbox: true` trên macOS/Linux; trên Windows hãy smoke test trước vì AppContainer có thể yêu cầu nâng quyền cho executable cài ngoài sandbox.
+
 ### 2. Cài skill từ GitHub
 
 Windows PowerShell:
@@ -111,6 +128,8 @@ Tiêu chí hoàn thành:
 ```
 
 Codex có thể tự kích hoạt skill cho task code đủ lớn và sẽ báo trước khi gọi Antigravity. Skill bỏ qua câu hỏi chỉ đọc, status/kế hoạch, sửa rất nhỏ và thay đổi chỉ có tài liệu để tiết kiệm quota.
+
+Mỗi vòng mới dùng `agy --new-project` để khóa tool của AGY vào đúng repository. Đây là guard bắt buộc: project mặc định của AGY có thể giữ workspace cũ dù trường `cwd` trong output hiển thị đúng.
 
 Điều khiển thủ công khi cần:
 
@@ -194,6 +213,8 @@ Helper lưu summary gọn tại `.agy-review/<task-id>/`. Prompt không được
 | Tiêu quota do lặp | trần vòng động; dừng sau hai vòng không tiến triển |
 | Ghi đè việc đang làm | ghi baseline; không tự reset, checkout hoặc clean |
 | Lộ secret trong log | không lưu prompt; raw event tắt mặc định |
+| AGY bị chặn nhưng báo nhầm lỗi schema | ghi `PERMISSION_BLOCKED`, dừng ngay và yêu cầu sửa quyền trước khi tốn vòng mới |
+| AGY đọc/chạy lệnh nhầm workspace | mỗi fresh round tạo project AGY mới gắn với target repo |
 | Tự ý commit/deploy/mua credit | bị chặn mặc định và cần quyền riêng |
 | UI build qua nhưng hiển thị lỗi | yêu cầu kiểm tra localhost và console |
 
