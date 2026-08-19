@@ -5,7 +5,7 @@ Thanks for helping improve the Antigravity Review Loop.
 ## Before opening a pull request
 
 - Keep the installable skill concise and under 500 lines.
-- Preserve the explicit-invocation and bounded-loop safety defaults.
+- Preserve conditional implicit invocation, its low-value exclusions and opt-out, and the bounded-loop safety defaults.
 - Do not add secrets, credentials, personal data, or unredacted logs.
 - Run:
 

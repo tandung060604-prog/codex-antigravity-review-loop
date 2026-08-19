@@ -141,10 +141,10 @@ For a compact read-only snapshot, run the repository's `scripts/daily_snapshot.p
 - Never promise a fixed token or credit amount; usage depends on model, repository size, task complexity, and output.
 - Mark Codex/OpenAI token usage `UNKNOWN` unless the host explicitly exposes it; AGY metrics do not include Codex usage.
 
-## Skill composition
+## Optional skill composition
 
-- **`codex-longrun` outside:** use it for durable state, one `READY` task at a time, checkpoints, handoffs, and resumption across sessions.
-- **`ponytail` alongside:** use it to enforce minimum coherent diffs, reuse existing dependencies, and reject speculative abstractions. Carry its constraints into the Antigravity prompt; Antigravity cannot directly invoke Codex skills.
+- **Optional `codex-longrun` outside:** use it for durable state, one `READY` task at a time, checkpoints, handoffs, and resumption across sessions.
+- **Optional `ponytail` alongside:** use it to enforce minimum coherent diffs, reuse existing dependencies, and reject speculative abstractions. Carry its constraints into the Antigravity prompt; Antigravity cannot directly invoke Codex skills.
 - **This skill inside:** use it for the bounded AGY implementation/review loop. Do not nest another AGY loop inside an AGY prompt.
 
 Read [references/integrations.md](references/integrations.md) when combining these workflows or when the task is long-running.

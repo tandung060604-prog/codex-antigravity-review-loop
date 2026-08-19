@@ -32,6 +32,7 @@ def main() -> int:
         ROOT / "SECURITY.md",
         ROOT / "docs" / "van-hanh-hang-ngay.md",
         ROOT / "docs" / "chi-phi-va-rui-ro.md",
+        ROOT / "docs" / "images" / "agy-review-loop-workflow.png",
         ROOT / "scripts" / "daily_snapshot.py",
     ]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]
@@ -64,6 +65,11 @@ def main() -> int:
     for marker in ("display_name:", "short_description:", "default_prompt:", "allow_implicit_invocation: true"):
         if marker not in yaml:
             fail(f"openai.yaml is missing {marker}")
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for marker in ("```mermaid", "Không bắt buộc", "docs/images/agy-review-loop-workflow.png"):
+        if marker not in readme:
+            fail(f"README.md is missing {marker}")
 
     print("repository validation passed")
     return 0

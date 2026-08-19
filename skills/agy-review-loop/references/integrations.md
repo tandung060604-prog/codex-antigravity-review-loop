@@ -1,18 +1,20 @@
 # Integrating the review loop
 
-## Recommended layering
+`agy-review-loop` works without `codex-longrun` or `ponytail`. Both integrations are optional and are not bundled with this repository.
+
+## Optional layering
 
 Use one owner for each concern:
 
-1. `codex-longrun` owns the project lifecycle: durable state, task IDs, acceptance criteria, checkpoints, handoffs, and resumption.
-2. `ponytail` owns implementation discipline: inspect first, reuse existing code/dependencies, prefer native solutions, and keep the smallest coherent diff.
-3. `agy-review-loop` owns delegation: call `agy`, inspect the real diff, run checks, and request bounded corrections.
+1. `agy-review-loop` owns the required delegation loop: call `agy`, inspect the real diff, run checks, and request bounded corrections.
+2. Optional `codex-longrun` owns the project lifecycle: durable state, task IDs, acceptance criteria, checkpoints, handoffs, and resumption.
+3. Optional `ponytail` owns implementation discipline: inspect first, reuse existing code/dependencies, prefer native solutions, and keep the smallest coherent diff.
 
-The layers should not recursively invoke each other. In practice, start a task with `$codex-longrun`, apply `$ponytail` when choosing the implementation, and explicitly invoke `$agy-review-loop` for the single `READY` task.
+The layers should not recursively invoke each other. A normal task can use only `agy-review-loop`. For a multi-session project, start with `$codex-longrun`, apply Ponytail when choosing the implementation, then let `agy-review-loop` handle the single `READY` task. Explicit invocation remains available but is not required when Codex selects the skill automatically.
 
 Daily reconciliation is a separate, read-only `codex-longrun` action. It should inspect durable state and Git without calling AGY; delegate only the approved `READY` task afterward.
 
-## Prompt template
+## Combined prompt template
 
 ```text
 $codex-longrun
@@ -22,7 +24,7 @@ Prepare one READY task for this objective:
 
 Use $ponytail principles for the implementation: inspect first, reuse what exists, prefer native/existing dependencies, and avoid speculative abstractions.
 
-Then use $agy-review-loop to delegate that READY task to Antigravity CLI. Keep the loop bounded to 5 rounds. Do not modify durable state files from inside Antigravity unless the task explicitly owns them.
+Then let $agy-review-loop delegate that READY task to Antigravity CLI. Keep the loop bounded to 5 rounds. Do not modify durable state files from inside Antigravity unless the task explicitly owns them.
 ```
 
 ## Ownership boundaries
