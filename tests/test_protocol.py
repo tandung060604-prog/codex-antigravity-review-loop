@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -97,6 +99,18 @@ class ProtocolTests(unittest.TestCase):
             self.runner.project_scope_args("conversation-1"),
             ["--conversation", "conversation-1"],
         )
+
+    def test_duration_parser_and_host_watchdog(self) -> None:
+        self.assertEqual(self.runner.parse_duration("1m30s"), 90.0)
+        started = time.monotonic()
+        _, _, _, timed_out = self.runner.run_process(
+            [sys.executable, "-c", "import time; time.sleep(2)"],
+            ROOT,
+            0.1,
+            0,
+        )
+        self.assertTrue(timed_out)
+        self.assertLess(time.monotonic() - started, 1.5)
 
     def test_codex_templates_are_valid_toml(self) -> None:
         files = list((ROOT / "examples" / "codex-profiles").glob("*.toml"))

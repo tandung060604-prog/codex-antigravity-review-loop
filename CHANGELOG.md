@@ -7,6 +7,7 @@ All notable changes to this project are documented here.
 - Enabled conditional implicit invocation for substantive coding tasks, with low-value exclusions and a per-task opt-out.
 - Reworked the Vietnamese README with a beginner-first quick start, an AI workflow illustration, an authoritative Mermaid diagram, and clear optional Longrun/Ponytail guidance.
 - Fixed integration, architecture, protocol, and contribution docs that still implied explicit-only invocation or mandatory companion skills.
+- Added a host watchdog and liveness heartbeat to stop stalled AGY rounds safely and record `TIMEOUT` evidence.
 
 ## 0.2.0 - 2026-08-14
 
