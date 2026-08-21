@@ -1,81 +1,75 @@
 # Codex Antigravity Review Loop
 
 [![Validate](https://github.com/tandung060604-prog/codex-antigravity-review-loop/actions/workflows/validate.yml/badge.svg)](https://github.com/tandung060604-prog/codex-antigravity-review-loop/actions/workflows/validate.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Public repository](https://img.shields.io/badge/repository-public-success.svg)](https://github.com/tandung060604-prog/codex-antigravity-review-loop)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Skill](https://img.shields.io/badge/Codex-skill-7c3aed.svg)](skills/agy-review-loop/SKILL.md)
+[![Repository](https://img.shields.io/badge/repository-public-success.svg)](https://github.com/tandung060604-prog/codex-antigravity-review-loop)
 
-Skill cho Codex để giao một task lập trình cho Google Antigravity CLI (`agy`), kiểm tra thay đổi thật trong repo, chạy validation và yêu cầu sửa tiếp trong số vòng có giới hạn.
+Skill tiếng Việt cho Codex: giao task lập trình không tầm thường cho Google Antigravity CLI (`agy`), sau đó Codex đọc diff thật, chạy kiểm thử độc lập và yêu cầu AGY sửa tiếp trong giới hạn vòng rõ ràng.
 
 ![Minh họa chu trình Codex Antigravity Review Loop](docs/images/agy-review-loop-workflow.png)
 
-> Ảnh trên là minh họa AI. Sơ đồ Mermaid bên dưới là mô tả kỹ thuật chính xác.
+> Ảnh trên là minh họa. Mermaid bên dưới là mô tả kỹ thuật chuẩn của workflow.
 
-## TL;DR
+## Bạn nhận được gì?
 
-- Cần có: **Codex**, **Git**, **Python**, **Antigravity CLI** và skill `agy-review-loop` trong repo này.
-- Không bắt buộc: `codex-longrun` và `ponytail`; hai công cụ này **không được bundle trong repo**.
-- Người mới nên chạy workflow lõi trước. Chỉ thêm Longrun khi dự án kéo dài nhiều phiên; chỉ thêm Ponytail khi muốn ép thay đổi tối giản.
-- Codex có thể tự chọn skill cho task code đủ lớn. Gọi `$agy-review-loop` nếu muốn ép sử dụng; nói `Không dùng Antigravity cho task này` nếu muốn bỏ qua.
-- Antigravity báo `DONE` chưa có nghĩa là hoàn thành: Codex vẫn phải đọc diff và chạy check thật.
+```text
+Mô tả task → Codex lập acceptance contract → AGY sửa code
+           → Codex kiểm tra diff/test → chấp nhận hoặc gửi finding sửa tiếp
+```
 
-## Hệ thống hoạt động như thế nào?
+- AGY là implementation worker; Codex là reviewer độc lập.
+- Mỗi vòng có prompt tự chứa, schema JSON và trần quota.
+- `DONE` từ AGY chỉ là báo cáo, không phải bằng chứng hoàn thành.
+- Thay đổi có sẵn của người dùng được giữ nguyên; không tự reset, clean, commit hay deploy.
+- Không cần chạy AGY như một service nền. Codex chỉ gọi khi task phù hợp.
+
+## Tương thích
+
+| Thành phần | Mức hỗ trợ |
+| --- | --- |
+| Antigravity CLI | 1.1.x; đã smoke test với `1.1.17` |
+| Codex | Skill implicit invocation hoặc gọi `$agy-review-loop` |
+| Python | 3.10+ để chạy helper và test repo |
+| Node.js | Không bắt buộc |
+| Git | Bắt buộc cho baseline, diff và scope guard |
+| Windows | PowerShell được kiểm tra; macOS/Linux dùng lệnh tương đương |
+
+Kiểm tra phiên bản thực tế của CLI bằng `agy --version`; model và flag có thể thay đổi theo tài khoản hoặc bản phát hành.
+
+## Chu trình hoạt động
 
 ```mermaid
 flowchart LR
-    U[Người dùng giao task] --> C[Codex lập tiêu chí và ghi baseline]
-    C --> S[agy-review-loop]
-    S --> A[Antigravity CLI triển khai]
+    U[Người dùng giao task] --> C[Codex đọc rule và ghi baseline]
+    C --> P[Acceptance contract]
+    P --> H[agy-review-loop]
+    H --> N[agy --new-project<br/>stream-json + JSON Schema]
+    N --> A[Antigravity sửa trong repo]
     A --> W[Working tree + checks]
-    W --> R[Codex review diff và kiểm thử]
-    R -->|Đạt tiêu chí| D[Chấp nhận]
-    R -->|Có finding| A
-
-    L[codex-longrun<br/>Tùy chọn: state và handoff] -. hỗ trợ Codex .-> C
-    P[ponytail<br/>Tùy chọn: thay đổi tối giản] -. hỗ trợ quyết định .-> C
+    W --> R[Codex review diff, test và localhost]
+    R -->|Đạt| D[ACCEPTED]
+    R -->|Có finding| F[Correction delta]
+    F --> H
+    R -->|Blocker/quota/trần vòng| B[STOPPED / BLOCKED]
 ```
 
-Luồng bắt buộc là:
+`--new-project` là guard quan trọng: project mặc định của AGY có thể giữ workspace cũ dù event `init.cwd` hiển thị đúng. Khi resume conversation đã được xác minh, helper dùng lại project gắn với conversation đó.
 
-```text
-Yêu cầu → Codex → agy-review-loop → Antigravity CLI → thay đổi trong repo
-          ↑                                      ↓
-          └──────── review diff + test ──────────┘
-```
+## Cài đặt nhanh
 
-`codex-longrun` và `ponytail` là hai lớp hỗ trợ quanh Codex, không phải hai bước Antigravity bắt buộc phải chạy.
-
-## Repo có sẵn Longrun và Ponytail không?
-
-Không. Repo chỉ đóng gói `agy-review-loop`.
-
-| Thành phần | Bắt buộc? | Có trong repo? | Dùng khi nào |
-| --- | --- | --- | --- |
-| `agy-review-loop` | Có | Có | Điều phối AGY, review và lặp sửa có giới hạn |
-| Antigravity CLI | Có | Không | Agent triển khai bên ngoài Codex |
-| `codex-longrun` | Không | Không | Dự án nhiều phiên, cần `READY` task, checkpoint và handoff |
-| [`ponytail`](https://github.com/DietrichGebert/ponytail) | Không | Không | Muốn ưu tiên giải pháp nhỏ nhất, tránh dependency và abstraction thừa |
-
-`codex-longrun` hiện là skill riêng trong môi trường của maintainer nhưng repo này chưa cung cấp nguồn cài public cho nó. Người dùng mới nên bỏ qua cho đến khi có một bản phát hành và đường dẫn cài độc lập.
-
-Khuyến nghị:
-
-- **Người mới hoặc task nhỏ–vừa:** chỉ dùng `agy-review-loop`.
-- **Dự án kéo dài nhiều ngày hoặc dễ mất context:** thêm một skill tương thích `codex-longrun`.
-- **Repo có xu hướng over-engineering:** thêm Ponytail.
-- **Dự án dài và phức tạp:** có thể dùng cả ba, nhưng từng lớp vẫn giữ đúng một trách nhiệm.
-
-## Bắt đầu nhanh
-
-### 1. Kiểm tra Antigravity CLI
+### 1. Cài Antigravity CLI và đăng nhập một lần
 
 ```powershell
 agy --version
-agy -p "Reply with exactly AGY_OK. Do not edit files or run commands." --output-format text
+agy --prompt-interactive
 ```
 
-Nếu `agy` chưa chạy hoặc chưa đăng nhập, hãy hoàn tất bước đó trước khi cài skill.
+Hoàn tất đăng nhập trong phiên tương tác. Sau đó headless mode dùng credential đã lưu; không cần mở PowerShell mỗi lần bật máy.
 
-Vì skill gọi AGY ở chế độ không tương tác, Antigravity không thể chờ bạn bấm **Allow**. Cấu hình an toàn là giữ `request-review` và chỉ tự động cho phép các lệnh đọc/kiểm thử thực sự cần trong `%USERPROFILE%\.gemini\antigravity-cli\settings.json` (Windows) hoặc `~/.gemini/antigravity-cli/settings.json` (macOS/Linux):
+### 2. Cấu hình quyền headless
+
+`agy -p` không có hộp thoại để chờ bạn bấm **Allow**. Chỉ cấp trước các lệnh thật sự cần trong `%USERPROFILE%\.gemini\antigravity-cli\settings.json` (Windows) hoặc `~/.gemini/antigravity-cli/settings.json`:
 
 ```json
 {
@@ -84,15 +78,21 @@ Vì skill gọi AGY ở chế độ không tương tác, Antigravity không th�
     "allow": [
       "command(git status)",
       "command(git diff)",
+      "command(git rev-parse)",
       "command(python -m pytest)"
     ]
-  }
+  },
+  "trustedWorkspaces": [
+    "C:/path/to/your/repo"
+  ]
 }
 ```
 
-Giữ lại các khóa khác đang có trong file và thay allowlist theo stack của repo. Không dùng `command(*)` hoặc `--dangerously-skip-permissions`. Có thể thử `proceed-in-sandbox` với `enableTerminalSandbox: true` trên macOS/Linux; trên Windows hãy smoke test trước vì AppContainer có thể yêu cầu nâng quyền cho executable cài ngoài sandbox.
+Giữ lại các khóa khác trong file. Không dùng `command(*)` và không bật `--dangerously-skip-permissions` cho workflow thông thường. `accept-edits` chỉ tự duyệt file edit; shell command vẫn chịu permission engine.
 
-### 2. Cài skill từ GitHub
+Nếu muốn thêm quyền bằng giao diện, mở `agy --prompt-interactive`, nhập `/permissions`, chọn **Project** và thêm rule hẹp. `proceed-in-sandbox` có thể tự chạy lệnh an toàn, nhưng Windows AppContainer có thể yêu cầu nâng quyền cho tool cài bên ngoài sandbox; hãy smoke test trước.
+
+### 3. Cài skill vào Codex
 
 Windows PowerShell:
 
@@ -112,14 +112,16 @@ python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github
 
 Khởi động lại Codex nếu skill chưa xuất hiện.
 
-### 3. Giao task bình thường
+## Cách sử dụng
 
-Không cần mở terminal hoặc tự chạy `agy`:
+### Cách mặc định
+
+Chỉ mô tả task trong Codex. Skill có thể tự kích hoạt cho task code đủ lớn:
 
 ```text
 Trong project hiện tại, sửa lỗi validation của form đăng nhập.
 
-Tiêu chí hoàn thành:
+Acceptance criteria:
 - tìm root cause trước khi sửa;
 - thêm regression test;
 - chạy lint và test liên quan;
@@ -127,21 +129,23 @@ Tiêu chí hoàn thành:
 - không commit, push hoặc deploy.
 ```
 
-Codex có thể tự kích hoạt skill cho task code đủ lớn và sẽ báo trước khi gọi Antigravity. Skill bỏ qua câu hỏi chỉ đọc, status/kế hoạch, sửa rất nhỏ và thay đổi chỉ có tài liệu để tiết kiệm quota.
-
-Mỗi vòng mới dùng `agy --new-project` để khóa tool của AGY vào đúng repository. Đây là guard bắt buộc: project mặc định của AGY có thể giữ workspace cũ dù trường `cwd` trong output hiển thị đúng.
-
-Điều khiển thủ công khi cần:
+### Ép dùng hoặc bỏ qua
 
 ```text
-$agy-review-loop                         # ép dùng skill
-Không dùng Antigravity cho task này.     # bỏ qua trong task hiện tại
-Giới hạn tối đa 2 vòng AGY.              # giảm quota
+$agy-review-loop
 ```
 
-## Ví dụ UI localhost
+```text
+Không dùng Antigravity cho task này.
+```
+
+Task chỉ đọc, status, lập kế hoạch, sửa rất nhỏ hoặc chỉ sửa tài liệu sẽ được bỏ qua để tiết kiệm quota.
+
+### Ví dụ UI localhost
 
 ```text
+$agy-review-loop
+
 Trong project localhost hiện tại, thêm motion tinh tế cho các khối giao diện:
 - section entrance và scroll reveal;
 - stagger cho card/list;
@@ -153,85 +157,117 @@ Tái sử dụng stack và dependency hiện có. Không rewrite ứng dụng.
 Kiểm tra localhost, console, lint, test và build. Không commit hoặc deploy.
 ```
 
-Xem thêm [frontend motion](examples/frontend-motion.md) và [backend bug fix](examples/backend-bugfix.md).
+Xem prompt hoàn chỉnh trong [frontend-motion.md](examples/frontend-motion.md) và [backend-bugfix.md](examples/backend-bugfix.md).
 
-## Codex làm gì sau mỗi vòng AGY?
+## Routing và giới hạn vòng
 
-1. Ghi trạng thái Git ban đầu và giữ nguyên thay đổi có sẵn của người dùng.
-2. Chuyển yêu cầu thành tiêu chí có thể kiểm tra.
-3. Giao đúng một vòng có structured output cho Antigravity.
-4. Xem báo cáo AGY như một claim, rồi tự đọc diff và chạy check thật.
-5. Nếu có lỗi, gửi finding ngắn kèm file và bằng chứng để AGY sửa.
-6. Chấp nhận khi mọi tiêu chí đạt; dừng khi hết trần vòng, không tiến triển hoặc cần quyền mới.
-
-Trần mặc định theo độ khó:
-
-| Class | Ví dụ | AGY mặc định | Trần vòng |
+| Class | Ví dụ | Model mặc định | Trần vòng |
 | --- | --- | --- | ---: |
-| Routine | sửa cơ học nhỏ | Gemini Flash Medium | 2 |
-| Standard | bug rõ, feature/UI thông thường | Gemini Flash Medium | 3 |
-| Complex | bug khó, refactor nhiều file | Gemini Flash High | 4 |
-| Critical | auth, payment, security, data integrity | Gemini Flash High | 5 |
+| `routine` | sửa cơ học nhỏ | Gemini Flash Medium | 2 |
+| `standard` | bug rõ, feature/UI thông thường | Gemini Flash Medium | 3 |
+| `complex` | bug khó, refactor nhiều file | Gemini Flash High | 4 |
+| `critical` | auth, payment, security, data integrity | Gemini Flash High | 5 |
 
-Gemini Pro chỉ được dùng sau khi chẩn đoán blocker và người dùng xác nhận. Model và quota thực tế phụ thuộc phiên bản CLI cùng tài khoản; kiểm tra bằng `agy models`, `/usage` và `/credits`.
+Gemini Pro chỉ dùng sau khi đã chẩn đoán blocker và người dùng xác nhận. Kiểm tra model/quota bằng `agy models`, `/usage` và `/credits`.
 
-## Dùng riêng hay kết hợp?
+Skill không chạy loop vô hạn. Codex dừng khi đạt acceptance, hết trần vòng, gặp hai vòng không tiến triển, hoặc cần quyền mới.
 
-### Workflow mặc định — phù hợp với đa số người dùng
+## Longrun và Ponytail có bắt buộc không?
 
-```text
-Codex → agy-review-loop → Antigravity CLI
+Không. Repo này chỉ đóng gói `agy-review-loop`.
+
+```mermaid
+flowchart LR
+    L[codex-longrun<br/>state / READY / handoff] -. tùy chọn .-> C[Codex]
+    P[ponytail<br/>minimal diff] -. tùy chọn .-> C
+    C --> A[agy-review-loop]
+    A --> G[Antigravity CLI]
 ```
 
-Không cần cài thêm gì ngoài các thành phần bắt buộc.
+| Lớp | Bắt buộc? | Trách nhiệm |
+| --- | --- | --- |
+| `agy-review-loop` | Có | Giao AGY, review diff, kiểm thử và bounded correction |
+| `codex-longrun` | Không | State dài hạn, task `READY`, checkpoint và handoff |
+| `ponytail` | Không | Chọn giải pháp nhỏ nhất, tránh abstraction/dependency thừa |
 
-### Thêm Ponytail — khi muốn code tối giản
-
-```text
-Ponytail policy → Codex → agy-review-loop → Antigravity CLI
-```
-
-Ponytail định hướng cách chọn giải pháp; `agy-review-loop` vẫn chịu trách nhiệm giao việc, review và dừng vòng lặp.
-
-### Thêm Longrun — khi dự án qua nhiều phiên
+Với dự án nhiều phiên, thứ tự nên là:
 
 ```text
-Longrun state/READY task → Codex → agy-review-loop → Antigravity CLI
+codex-longrun → Ponytail → agy-review-loop → Antigravity CLI
 ```
 
-Longrun giữ project state và handoff. Antigravity không nên tự sửa các file state nếu task không sở hữu chúng.
+Mỗi lớp chỉ giữ một trách nhiệm. Xem [integrations.md](skills/agy-review-loop/references/integrations.md) trước khi kết hợp.
 
-Xem [hướng dẫn tích hợp](skills/agy-review-loop/references/integrations.md) trước khi dùng cả ba lớp.
+## Quyền, dữ liệu và chi phí
 
-## Dữ liệu, quota và rủi ro
+### Quyền
 
-Helper lưu summary gọn tại `.agy-review/<task-id>/`. Prompt không được lưu; raw JSONL mặc định tắt vì tool event có thể chứa dữ liệu nhạy cảm.
+- Headless mode không thể tự bấm hộp xác nhận; hãy dùng allowlist hoặc `/permissions` theo project.
+- Không tự động hóa việc bấm **Allow** bằng AutoHotkey/GUI script; dễ cấp nhầm quyền và không ổn định.
+- Không dùng `--dangerously-skip-permissions` trừ khi người dùng chủ động phê duyệt cho một repo cô lập.
+- Quyền, credential, thay đổi billing, deploy production và xóa hàng loạt luôn là blocker cần hỏi người dùng.
 
-| Rủi ro | Cách kiểm soát |
-| --- | --- |
-| AGY báo xong nhưng code chưa đạt | Codex đọc diff và chạy check độc lập |
-| Tiêu quota do lặp | trần vòng động; dừng sau hai vòng không tiến triển |
-| Ghi đè việc đang làm | ghi baseline; không tự reset, checkout hoặc clean |
-| Lộ secret trong log | không lưu prompt; raw event tắt mặc định |
-| AGY bị chặn nhưng báo nhầm lỗi schema | ghi `PERMISSION_BLOCKED`, dừng ngay và yêu cầu sửa quyền trước khi tốn vòng mới |
-| AGY đọc/chạy lệnh nhầm workspace | mỗi fresh round tạo project AGY mới gắn với target repo |
-| Tự ý commit/deploy/mua credit | bị chặn mặc định và cần quyền riêng |
-| UI build qua nhưng hiển thị lỗi | yêu cầu kiểm tra localhost và console |
+### Dữ liệu
 
-Skill không chạy nền, không tự mua AI credits và không vượt quyền truy cập. Xem [chi phí và rủi ro](docs/chi-phi-va-rui-ro.md) cùng [vận hành hằng ngày](docs/van-hanh-hang-ngay.md).
+- Prompt không được lưu vào summary.
+- Raw AGY event tắt mặc định vì có thể chứa nội dung file/tool payload.
+- Không đưa secret, PII, dataset thật hoặc log production chưa lọc vào prompt/repo public.
+- `.agy-review/` chỉ lưu metadata, usage, trạng thái protocol và structured output cần thiết.
+
+### Chi phí
+
+- Dùng `routine`/`standard` cho task nhỏ; không mặc định chạy tới 5 vòng.
+- Chạy test mục tiêu trước full suite.
+- Giữ correction delta ngắn và không lặp lại toàn bộ lịch sử.
+- Dừng sau hai vòng không tiến triển.
+- Token Codex và quota AGY là hai đồng hồ khác nhau; không hứa một mức credit cố định.
+
+Xem [chi phí và rủi ro](docs/chi-phi-va-rui-ro.md) và [vận hành hằng ngày](docs/van-hanh-hang-ngay.md).
+
+## Khi AGY bị chặn
+
+| Dấu hiệu | Nguyên nhân thường gặp | Cách xử lý |
+| --- | --- | --- |
+| `PERMISSION_BLOCKED` | Headless gặp permission `Ask` | Thêm allow rule hẹp, không đổi model |
+| File bị tìm ở workspace cũ | Default project của AGY bị giữ lại | Để helper dùng `--new-project` |
+| `AUTH_REQUIRED` | Credential hết hạn hoặc chưa đăng nhập | Chạy `agy --prompt-interactive` một lần |
+| `TIMEOUT` | AGY không trả result trong thời gian bị giới hạn | Đọc summary, kiểm tra permission/prompt/worktree; chỉ retry khi đã có nguyên nhân cụ thể |
+| Sandbox yêu cầu nâng quyền Windows | AppContainer không chạy được executable ngoài sandbox | Tắt sandbox cho round đó và dùng allowlist command cụ thể |
+| Structured output không hợp lệ | AGY chưa trả schema bắt buộc | Codex phân loại protocol, review nguyên nhân, không chấp nhận `DONE` mù quáng |
+
+Helper ghi lỗi runtime rõ ràng trong `.agy-review/<task-id>/summary.json`; lỗi quyền là `PERMISSION_BLOCKED` và protocol là `NOT_REACHED`, không bị gắn nhầm thành lỗi schema.
+
+## Chạy helper thủ công
+
+```powershell
+python skills\agy-review-loop\scripts\agy_round.py `
+  --repo C:\path\to\repo `
+  --task-id AUTH-142 `
+  --round 1 `
+  --class standard `
+  --prompt-file C:\path\to\prompt.txt
+```
+
+Helper tự thêm `--new-project` cho fresh round, gọi `stream-json` + JSON Schema và lưu summary tại `.agy-review/AUTH-142/`. Mặc định AGY có 5 phút và host watchdog thêm 30 giây; heartbeat 30 giây báo round còn sống. Chỉ truyền `--conversation <id>` khi ID đó đã xuất hiện trong summary của chính task.
+
+Không bật `--save-events` trừ khi cần audit; raw JSONL có thể chứa dữ liệu nhạy cảm.
 
 ## Cấu trúc repo
 
 ```text
-skills/agy-review-loop/       skill cài vào Codex
-  agents/openai.yaml          metadata và implicit invocation
-  scripts/agy_round.py        chạy một vòng AGY có cấu trúc
+skills/agy-review-loop/
+  SKILL.md                    hướng dẫn vận hành Codex
+  scripts/agy_round.py        chạy một round AGY có cấu trúc
   assets/                     JSON Schema và routing policy
-  references/                 protocol, tích hợp, chi phí, vận hành
-docs/                         tài liệu chuyên sâu
-examples/                     prompt và profile mẫu
-scripts/                      validator và daily snapshot
-tests/                        kiểm tra protocol và cấu trúc
+  references/                 tích hợp, chi phí, prompt và vận hành
+  agents/openai.yaml          metadata cho implicit invocation
+docs/
+  architecture.md             trách nhiệm và state model
+  v0.2-structured-protocol.md protocol/metrics
+  chi-phi-va-rui-ro.md        chi phí và rủi ro
+  van-hanh-hang-ngay.md       prompt đối chiếu hằng ngày
+examples/                     prompt UI/backend mẫu
+tests/                        regression cho protocol và cấu trúc
 ```
 
 ## Phát triển và đóng góp
@@ -244,14 +280,19 @@ python -m unittest discover -s tests -p "test_*.py"
 python "$env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py" skills/agy-review-loop
 ```
 
-Tài liệu liên quan:
+Trước khi mở pull request, đọc [CONTRIBUTING.md](CONTRIBUTING.md). Không commit credential, dữ liệu cá nhân, raw logs hoặc thay đổi ngoài phạm vi.
 
-- [Structured protocol và model routing](docs/v0.2-structured-protocol.md)
-- [Kiến trúc](docs/architecture.md)
-- [Vận hành hằng ngày](docs/van-hanh-hang-ngay.md)
-- [Chi phí và rủi ro](docs/chi-phi-va-rui-ro.md)
-- [Hướng dẫn đóng góp](CONTRIBUTING.md)
+## Tài liệu chính
+
+- [SKILL.md](skills/agy-review-loop/SKILL.md) — hợp đồng vận hành đầy đủ.
+- [Structured protocol](docs/v0.2-structured-protocol.md) — schema, summary và routing.
+- [Architecture](docs/architecture.md) — trách nhiệm giữa Codex, Longrun, Ponytail và AGY.
+- [Integrations](skills/agy-review-loop/references/integrations.md) — cách kết hợp workflow.
+- [Daily operations](docs/van-hanh-hang-ngay.md) — đối chiếu đầu/cuối ngày.
+- [Cost and risk](docs/chi-phi-va-rui-ro.md) — tối ưu quota và giới hạn an toàn.
+- [Antigravity headless mode](https://antigravity.google/docs/cli/headless/) — tài liệu chính thức của AGY.
+- [Antigravity permissions](https://antigravity.google/docs/cli/permissions) — allow/deny/ask và scope.
 
 ## License
 
-Apache License 2.0. Bạn có thể sử dụng, sửa đổi, tích hợp và cung cấp dịch vụ thương mại theo license. Xem [NOTICE](NOTICE) về attribution và thương hiệu.
+Apache License 2.0. Bạn có thể sử dụng, sửa đổi, tích hợp và thương mại hóa theo license. Xem [NOTICE](NOTICE) về attribution và thương hiệu.

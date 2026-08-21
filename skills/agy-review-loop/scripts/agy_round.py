@@ -9,6 +9,8 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,7 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = SKILL_ROOT / "assets" / "routing-policy.json"
 DEFAULT_SCHEMA = SKILL_ROOT / "assets" / "agy-result.schema.json"
 TASK_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
+DURATION_PART_RE = re.compile(r"(?P<value>\d+(?:\.\d+)?)(?P<unit>[hms])")
 USAGE_FIELDS = (
     "input_tokens",
     "output_tokens",
@@ -123,6 +126,63 @@ def project_scope_args(conversation: str | None) -> list[str]:
     return ["--conversation", conversation] if conversation else ["--new-project"]
 
 
+def parse_duration(value: str) -> float:
+    text = value.strip().lower()
+    if text.isdigit():
+        return float(text)
+    matches = list(DURATION_PART_RE.finditer(text))
+    if not matches or "".join(match.group(0) for match in matches) != text:
+        raise ValueError(f"invalid duration: {value!r} (use e.g. 5m, 30s, or 1m30s)")
+    scales = {"h": 3600.0, "m": 60.0, "s": 1.0}
+    seconds = sum(float(match.group("value")) * scales[match.group("unit")] for match in matches)
+    if seconds <= 0:
+        raise ValueError("duration must be greater than zero")
+    return seconds
+
+
+def run_process(
+    command: list[str],
+    repo: Path,
+    host_timeout: float,
+    heartbeat_seconds: float,
+) -> tuple[int, str, str, bool]:
+    process = subprocess.Popen(
+        command,
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    stop_heartbeat = threading.Event()
+    started = time.monotonic()
+
+    def heartbeat() -> None:
+        while not stop_heartbeat.wait(heartbeat_seconds):
+            if process.poll() is not None:
+                return
+            elapsed = int(time.monotonic() - started)
+            print(f"[agy-review-loop] AGY still running ({elapsed}s elapsed)", file=sys.stderr, flush=True)
+
+    monitor = None
+    if heartbeat_seconds > 0:
+        monitor = threading.Thread(target=heartbeat, daemon=True)
+        monitor.start()
+    timed_out = False
+    try:
+        stdout, stderr = process.communicate(timeout=host_timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        process.kill()
+        stdout, stderr = process.communicate()
+    finally:
+        stop_heartbeat.set()
+        if monitor is not None:
+            monitor.join(timeout=1)
+    return process.returncode, stdout or "", stderr or "", timed_out
+
+
 def aggregate(rounds: list[dict[str, Any]]) -> dict[str, Any]:
     totals = {field: 0 for field in USAGE_FIELDS}
     models: list[str] = []
@@ -153,7 +213,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prompt-file", required=True, help="UTF-8 prompt file")
     parser.add_argument("--model", help="override AGY model from the routing policy")
     parser.add_argument("--conversation", help="verified conversation ID for this task")
-    parser.add_argument("--print-timeout", default="10m")
+    parser.add_argument("--print-timeout", default="5m")
+    parser.add_argument(
+        "--host-timeout",
+        help="hard host watchdog; defaults to --print-timeout plus 30 seconds",
+    )
+    parser.add_argument(
+        "--heartbeat-seconds",
+        type=float,
+        default=30.0,
+        help="write a liveness heartbeat to stderr (0 disables it)",
+    )
     parser.add_argument("--agy", help="path to agy executable")
     parser.add_argument("--policy", default=str(DEFAULT_POLICY))
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
@@ -188,6 +258,14 @@ def main() -> int:
     )
     if git_check.returncode:
         raise SystemExit(f"not a Git repository: {repo}")
+
+    try:
+        print_timeout = parse_duration(args.print_timeout)
+        host_timeout = parse_duration(args.host_timeout) if args.host_timeout else print_timeout + 30.0
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.heartbeat_seconds < 0:
+        raise SystemExit("--heartbeat-seconds cannot be negative")
 
     model = args.model or route["agy_model"]
     allowed_models = set(policy.get("agy_models", []))
@@ -235,20 +313,24 @@ def main() -> int:
         command.append("--sandbox")
 
     started_at = datetime.now(timezone.utc).isoformat()
-    completed = subprocess.run(
+    returncode, stdout, stderr, host_timed_out = run_process(
         command,
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
+        repo,
+        host_timeout,
+        args.heartbeat_seconds,
     )
     finished_at = datetime.now(timezone.utc).isoformat()
-    events, warnings = parse_events(completed.stdout)
+    events, warnings = parse_events(stdout)
     result_event = next((item["result"] for item in reversed(events) if item.get("event") == "result" and isinstance(item.get("result"), dict)), None)
     structured_output = result_event.get("structured_output") if result_event else None
-    failure = classify_failure(completed.returncode, result_event, completed.stderr)
+    failure = (
+        {
+            "kind": "TIMEOUT",
+            "message": f"Host watchdog stopped Antigravity after {host_timeout:g} seconds.",
+        }
+        if host_timed_out
+        else classify_failure(returncode, result_event, stderr)
+    )
     protocol_errors = [] if failure else validate_result(structured_output)
 
     init_event = next((item.get("init") for item in events if item.get("event") == "init"), None)
@@ -267,7 +349,7 @@ def main() -> int:
         "started_at": started_at,
         "finished_at": finished_at,
         "conversation_id": conversation_id,
-        "process_returncode": completed.returncode,
+        "process_returncode": returncode,
         "agy_status": result_event.get("status") if result_event else "MISSING_RESULT",
         "protocol_status": (
             structured_output.get("status")
@@ -281,17 +363,19 @@ def main() -> int:
         "structured_output": structured_output,
         "warnings": warnings + protocol_errors,
         "raw_events_saved": args.save_events,
+        "host_timeout_seconds": host_timeout,
+        "heartbeat_seconds": args.heartbeat_seconds,
     }
     if isinstance(init_event, dict) and init_event.get("model") != model:
         record["warnings"].append(f"AGY initialized unexpected model: {init_event.get('model')}")
     if failure:
         record["warnings"].append(failure["message"])
-    elif completed.stderr.strip():
+    elif stderr.strip():
         record["warnings"].append("AGY wrote to stderr; inspect the live run output")
 
     task_dir.mkdir(parents=True, exist_ok=True)
     if args.save_events:
-        (task_dir / f"round-{args.round_number}.jsonl").write_text(completed.stdout, encoding="utf-8")
+        (task_dir / f"round-{args.round_number}.jsonl").write_text(stdout, encoding="utf-8")
     (task_dir / f"round-{args.round_number}.summary.json").write_text(
         json.dumps(record, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
